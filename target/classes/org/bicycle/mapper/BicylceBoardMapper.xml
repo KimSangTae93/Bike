@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--mapper의 namespace 속성은 Mapper인터페이스와 동일하게 작성 -->
+<mapper namespace="org.bicycle.mapper.BicylceBoardMapper">
+
+
+	<sql id="criteria">
+		<trim prefix="(" suffix=") AND " prefixOverrides="OR">
+			<foreach item='type' collection="typeArr">
+				<trim prefix="OR">
+					<choose>
+						<when test="type == 'T'.toString()">
+							title like '%'||#{keyword}||'%'
+						</when>
+						<when test="type == 'C'.toString()">
+							content like '%'||#{keyword}||'%'
+						</when>
+						<when test="type == 'W'.toString()">
+							writer like '%'||#{keyword}||'%'
+						</when>
+					</choose>
+				</trim>
+			</foreach>
+		</trim>
+	</sql>
+
+	<!-- id값은 메스드 값과 일치 -->
+	<!--resultType속성은 select쿼리의 결과를 특정 클래스의 객체로 만들기 위해 설정 -->
+	<select id="getList" resultType="org.bicycle.domain.BicylceBoardVO">
+
+<![CDATA[
+	SELECT * FROM tbl_board where bno > 0 
+]]>
+
+
+	</select>
+	<!--CREATE 시작 -->
+	<!--단순히 시퀀스 다음값을 구해 insert할떄 사용 -->
+	<insert id="insert">
+		INSERT into tbl_board(bno,title,content,writer)
+		values (seq_board.nextval,#{title},#{content},#{writer})
+	</insert>
+
+	<!--@selectKey라는 Mybatis어노테이션 사용 주로 PK값을 미리 SQL을 통해 처리하고 특정이름으로 결과를 보관 하는 
+		방식 -->
+	<insert id="insertSelectKey">
+		<selectKey keyProperty="bno" order="BEFORE" resultType="long">
+			 SELECT seq_board.nextval from dual 
+			
+		</selectKey>
+
+		INSERT into tbl_board(bno,title,content,writer)
+		values (#{bno}, #{title}, #{content}, #{writer})
+	</insert>
+	<!--CREATE 끝 -->
+
+	<!--READ 시작 -->
+	<select id="read" resultType="org.bicycle.domain.BicylceBoardVO">
+		select * from tbl_board where bno = #{bno}
+	</select>
+	<!--READ 끝 -->
+
+	<!--DELETE 시작 -->
+	<delete id="delete">
+		delete from tbl_board where bno = #{bno}
+	</delete>
+	<!--DELETE 끝 -->
+
+	<!--UPDATE시작 -->
+
+	<update id="update">
+		update tbl_board
+		set title = #{title},
+		content = #{content},
+		writer = #{writer},
+		updated = sysdate
+		where bno = #{bno}
+	</update>
+	<!--UPDATE끝 -->
+	
+	<update id="updateReplyCnt">
+		update tbl_board set replycnt = replycnt + #{amount} where bno = #{bno}
+	</update>
+	<!--페이징처리+검색조건  -->
+	<!--foreach를 이용해 검색조건을 처리하는데  typeArr속성을 이용-->
+	<!--Mybatis는 원하는 속성을 찾을떄 getTypeArr()과 같이 이름에 기반을 두어 검색하기 때문에 Criteria에 만들어 놓은 getTtypeArr()결과인 문자열의 배열이forEach의 대상이된다.  -->
+	<!--Mybatis는 javaBean 규칙을 따르지않고,get/set메서드만을 사용하는 방식이다.  -->	
+	<select id="getListWithPaging" resultType="org.bicycle.domain.BicylceBoardVO">
+<![CDATA[
+  select 
+    bno, title, content, writer, regdate, updated, replycnt
+  from 
+      (
+      select /*+INDEX_DESC(tbl_board pk_board) */
+        rownum rn, bno, title, content, writer, regdate, updated, replycnt
+      from 
+        tbl_board
+      where 
+  ]]> <include refid="criteria"></include>
+		<!-- <trim prefix="(" suffix=") AND " prefixOverrides="OR">
+			<foreach item='type' collection="typeArr">
+				<trim prefix="OR">
+					<choose>
+						<when test="type == 'T'.toString()">
+							title like '%'||#{keyword}||'%'
+						</when>
+						<when test="type == 'C'.toString()">
+							content like '%'||#{keyword}||'%'
+						</when>
+						<when test="type == 'W'.toString()">
+							writer like '%'||#{keyword}||'%'
+						</when>
+					</choose>
+				</trim>
+			</foreach>
+		</trim> -->
+      
+  <![CDATA[    
+      rownum <= #{pageNum} * #{amount}
+      )
+  where rn > (#{pageNum} -1) * #{amount}   
+  ]]>
+	</select>
+	
+	<!--데이터베이스의 실제 모든 게시물수 계산  -->
+	
+	<select id="getTotalCount" resultType="int">
+		select count(*) from tbl_board where 
+		
+		<include refid="criteria"></include> 
+		
+		bno > 0
+	</select>
+</mapper>
